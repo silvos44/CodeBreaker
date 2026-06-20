@@ -1,0 +1,745 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CodeBreaker</title>
+
+
+<style>
+*{
+    box-sizing:border-box;
+    font-family:Arial,sans-serif;
+}
+
+
+body{
+    background:#1e1e1e;
+    color:white;
+    margin:0;
+    padding:20px;
+}
+
+
+.container{
+    max-width:800px;
+    margin:auto;
+}
+
+
+h1,h2{
+    text-align:center;
+}
+
+
+.panel{
+    background:#2d2d2d;
+    border-radius:12px;
+    padding:15px;
+    margin-bottom:15px;
+}
+
+
+.slots{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin:20px 0;
+}
+
+
+.slot{
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    border:3px solid #555;
+    cursor:pointer;
+}
+
+
+.slot.selected{
+    border:3px solid white;
+}
+
+
+.palette{
+    display:grid;
+    grid-template-columns:repeat(3,70px);
+    gap:12px;
+    justify-content:center;
+    margin:15px 0;
+}
+
+
+.colorBtn{
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    cursor:pointer;
+    border:3px solid white;
+}
+
+
+button{
+    padding:10px 20px;
+    margin:5px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:bold;
+}
+
+
+.primary{
+    background:#4CAF50;
+    color:white;
+}
+
+
+.secondary{
+    background:#666;
+    color:white;
+}
+
+
+.historyRow{
+    background:#3b3b3b;
+    border-radius:8px;
+    padding:10px;
+    margin-bottom:10px;
+}
+
+
+.rowColors{
+    display:flex;
+    gap:8px;
+}
+
+
+.mini{
+    width:25px;
+    height:25px;
+    border-radius:50%;
+}
+
+
+.feedback{
+    margin-top:8px;
+    font-size:20px;
+}
+
+
+.center{
+    text-align:center;
+}
+
+
+.hidden{
+    display:none;
+}
+
+
+#message{
+    text-align:center;
+    font-size:22px;
+    font-weight:bold;
+    margin-top:10px;
+}
+</style>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e1e1e">
+</head>
+
+
+<body>
+
+
+<div class="container">
+
+
+<h1>🎯 CODEBREAKER</h1>
+
+
+<div class="panel center" id="playersSelect">
+    <button onclick="startSinglePlayer()">1 Joueur</button>
+    <button onclick="startTwoPlayer()">2 Joueurs</button>
+</div>
+
+
+<div id="secretSetup" class="panel hidden">
+
+
+    <h2>Joueur 1 : Choisis le code secret</h2>
+
+
+    <div id="secretSlots" class="slots"></div>
+
+
+    <div class="palette" id="secretPalette"></div>
+
+
+    <div class="center">
+        <button class="primary" onclick="validateSecret()">
+            Commencer la partie
+        </button>
+    </div>
+
+
+</div>
+
+
+<div id="gameArea" class="hidden">
+
+
+<div class="panel">
+    <div id="attempts">Coups : 0 / 12</div>
+
+
+    <div id="guessSlots" class="slots"></div>
+
+
+    <div id="palette" class="palette"></div>
+
+
+    <div class="center">
+        <button class="primary" id="validBtn" onclick="submitGuess()">
+            Valider
+        </button>
+
+
+        <button class="secondary" id="newGameBtn" onclick="newGame()">
+            Nouvelle partie
+        </button>
+    </div>
+
+
+    <div id="message"></div>
+</div>
+
+
+<div class="panel">
+    <h2>Historique</h2>
+    <div id="history"></div>
+</div>
+
+
+</div>
+
+
+<div class="panel">
+    <h2>Statistiques</h2>
+
+
+    <div id="stats"></div>
+
+
+    <div class="center">
+        <button onclick="resetStats()">
+            Réinitialiser
+        </button>
+    </div>
+</div>
+
+
+</div>
+
+
+<script>
+
+
+const COLORS = [
+    "#e53935",
+    "#1e88e5",
+    "#43a047",
+    "#fdd835",
+    "#8e24aa",
+    "#fb8c00"
+];
+
+
+let game = {status:"notStarted"};
+let stats = {};
+
+
+function defaultStats(){
+    return {
+        gamesPlayed:0,
+        gamesWon:0,
+        bestScore:null,
+        totalAttempts:0
+    };
+}
+
+
+function saveGame(){
+    localStorage.setItem("cb_game",JSON.stringify(game));
+}
+
+
+function saveStats(){
+    localStorage.setItem("cb_stats",JSON.stringify(stats));
+}
+
+
+function load(){
+
+    document.getElementById("playersSelect").classList.remove("hidden");
+    document.getElementById("validBtn").classList.remove("hidden");
+    stats = JSON.parse(
+        localStorage.getItem("cb_stats")
+    ) || defaultStats();
+
+
+    const saved = JSON.parse(
+        localStorage.getItem("cb_game")
+    );
+
+
+    if(saved){
+        game=saved;
+
+
+        if(game.phase==="playing"){
+            document.getElementById("gameArea").classList.remove("hidden");
+            renderGame();
+        }
+    }
+
+
+    renderStats();
+}
+
+
+function startSinglePlayer(){
+
+
+    game={
+        mode:1,
+        phase:"playing",
+        secret:Array.from({length:4},
+        ()=>Math.floor(Math.random()*6)),
+        current:[null,null,null,null],
+        selected:0,
+        attempts:[],
+        moveCount:0,
+        status:"playing"
+    };
+
+
+    saveGame();
+
+
+    document.getElementById("secretSetup").classList.add("hidden");
+    document.getElementById("playersSelect").classList.add("hidden");
+    document.getElementById("gameArea").classList.remove("hidden");    
+    document.getElementById("validBtn").classList.remove("hidden");
+
+
+    renderGame();
+}
+
+
+function startTwoPlayer(){
+
+
+    game={
+        mode:2,
+        phase:"setup",
+        secret:[null,null,null,null],
+        selected:0,
+        status:"playing"
+    };
+
+
+    renderSecretSetup();
+
+
+    document.getElementById("secretSetup").classList.remove("hidden");
+    document.getElementById("playersSelect").classList.add("hidden");
+    document.getElementById("gameArea").classList.add("hidden");    
+    document.getElementById("validBtn").classList.remove("hidden");
+}
+
+
+function renderSecretSetup(){
+
+
+    const slots=document.getElementById("secretSlots");
+    slots.innerHTML="";
+
+
+    game.secret.forEach((c,i)=>{
+
+
+        const div=document.createElement("div");
+        div.className="slot";
+
+
+        if(i===game.selected)
+            div.classList.add("selected");
+
+
+        div.style.background=
+            c===null?"#444":"#999";
+
+
+        div.onclick=()=>{
+            game.selected=i;
+            renderSecretSetup();
+        };
+
+
+        slots.appendChild(div);
+    });
+
+
+    const pal=document.getElementById("secretPalette");
+    pal.innerHTML="";
+
+
+    COLORS.forEach((color,index)=>{
+
+
+        const b=document.createElement("div");
+        b.className="colorBtn";
+        b.style.background=color;
+
+
+        b.onclick=()=>{
+            game.secret[game.selected]=index;
+            game.selected=(game.selected+1)%4;
+            renderSecretSetup();
+        };
+
+
+        pal.appendChild(b);
+    });
+}
+
+
+function validateSecret(){
+
+
+    if(game.secret.includes(null)){
+        alert("Complète le code.");
+        return;
+    }
+
+
+    game.phase="playing";
+    game.current=[null,null,null,null];
+    game.attempts=[];
+    game.moveCount=0;
+    game.selected=0;
+
+
+    saveGame();
+
+
+    document.getElementById("secretSetup").classList.add("hidden");
+    document.getElementById("gameArea").classList.remove("hidden");
+
+
+    renderGame();
+}
+
+
+function renderGame(){
+
+
+    document.getElementById("attempts").innerHTML=
+        "Coups : "+game.moveCount+" / 12";
+
+
+    const slots=document.getElementById("guessSlots");
+    slots.innerHTML="";
+
+
+    game.current.forEach((c,i)=>{
+
+
+        const div=document.createElement("div");
+        div.className="slot";
+
+
+        if(i===game.selected)
+            div.classList.add("selected");
+
+
+        div.style.background=
+            c===null?"#444":COLORS[c];
+
+
+        div.onclick=()=>{
+            game.selected=i;
+            renderGame();
+        };
+
+
+        slots.appendChild(div);
+    });
+
+
+    const pal=document.getElementById("palette");
+    pal.innerHTML="";
+
+
+    COLORS.forEach((color,index)=>{
+
+
+        const b=document.createElement("div");
+        b.className="colorBtn";
+        b.style.background=color;
+
+
+        b.onclick=()=>{
+            console.log("Clicked color",index, game.phase);
+            if(game.phase === 'playing') {
+                game.current[game.selected]=index;
+                game.selected=(game.selected+1)%4;
+                saveGame();
+                renderGame();
+            }
+        };
+
+
+        pal.appendChild(b);
+    });
+
+
+    renderHistory();
+}
+
+
+function evaluate(secret,guess){
+
+
+    let black=0;
+    let white=0;
+
+
+    const s=[...secret];
+    const g=[...guess];
+
+
+    for(let i=0;i<4;i++){
+        if(s[i]===g[i]){
+            black++;
+            s[i]=null;
+            g[i]=null;
+        }
+    }
+
+
+    for(let i=0;i<4;i++){
+
+
+        if(g[i]===null) continue;
+
+
+        const pos=s.indexOf(g[i]);
+
+
+        if(pos!==-1){
+            white++;
+            s[pos]=null;
+        }
+    }
+
+
+    return {black,white};
+}
+
+
+function submitGuess(){
+
+
+    if(game.current.includes(null)){
+        alert("Complète les 4 couleurs.");
+        return;
+    }
+
+
+    const result=evaluate(
+        game.secret,
+        game.current
+    );
+
+
+    game.moveCount++;
+
+
+    game.attempts.unshift({
+        guess:[...game.current],
+        black:result.black,
+        white:result.white
+    });
+
+
+    if(result.black===4){
+
+
+        stats.gamesPlayed++;
+        stats.gamesWon++;
+        stats.totalAttempts+=game.moveCount;
+
+
+        if(
+            stats.bestScore===null ||
+            game.moveCount<stats.bestScore
+        ){
+            stats.bestScore=game.moveCount;
+        }
+
+
+        saveStats();
+
+        document.getElementById("validBtn").classList.add("hidden");
+        game.phase="finished";
+
+
+        document.getElementById("message").innerHTML=
+            "🎉 Gagné en "+game.moveCount+" coups !";
+        
+
+
+        localStorage.removeItem("cb_game");
+    }
+    else if(game.moveCount>=12){
+
+
+        stats.gamesPlayed++;
+        stats.totalAttempts+=game.moveCount;
+
+
+        saveStats();
+
+        document.getElementById("validBtn").classList.add("hidden");
+        game.phase="finished";
+
+        document.getElementById("message").innerHTML=
+            "❌ Perdu !";
+
+
+        localStorage.removeItem("cb_game");
+    }
+    else{
+
+
+        game.current=[null,null,null,null];
+        game.selected=0;
+
+
+        saveGame();
+    }
+
+
+    renderStats();
+    renderGame();
+}
+
+
+function renderHistory(){
+
+
+    const h=document.getElementById("history");
+    h.innerHTML="";
+
+
+    game.attempts.forEach(row=>{
+
+
+        const div=document.createElement("div");
+        div.className="historyRow";
+
+
+        let html='<div class="rowColors">';
+
+
+        row.guess.forEach(c=>{
+            html+=`
+            <div class="mini"
+                 style="background:${COLORS[c]}">
+            </div>`;
+        });
+
+
+        html+='</div>';
+
+
+        html+=`
+        <div class="feedback">
+        ⚫ ${row.black}
+        ⚪ ${row.white}
+        </div>`;
+
+
+        div.innerHTML=html;
+
+
+        h.appendChild(div);
+    });
+}
+
+
+function renderStats(){
+
+
+    const rate=
+        stats.gamesPlayed
+        ? Math.round(
+            stats.gamesWon/
+            stats.gamesPlayed*100
+          )
+        : 0;
+
+
+    document.getElementById("stats").innerHTML=`
+        Parties : ${stats.gamesPlayed}<br>
+        Victoires : ${stats.gamesWon}<br>
+        Réussite : ${rate}%<br>
+        Meilleur score : ${
+            stats.bestScore ?? "-"
+        }<br>
+        Tentatives totales :
+        ${stats.totalAttempts}
+    `;
+}
+
+
+function resetStats(){
+
+
+    if(confirm("Réinitialiser ?")){
+        stats=defaultStats();
+        saveStats();
+        renderStats();
+    }
+}
+
+
+function newGame(){
+
+
+    document.getElementById("message").innerHTML="";
+    document.getElementById("playersSelect").classList.remove("hidden");
+    document.getElementById("gameArea").classList.add("hidden");
+    //startSinglePlayer();
+}
+
+
+load();
+
+
+</script>
+
+
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js');
+}
+</script>
+
+</body>
+</html>
