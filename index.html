@@ -664,14 +664,16 @@ function renderHistory(){
         });
 
 
+        html+='</div><div class="feedback">';
+
+        for(let i=0;i<row.black;i++){
+            html+=`⚫ `;
+        }
+        for(let i=0;i<row.white;i++){
+            html+=`⚪ `;
+        }
+
         html+='</div>';
-
-
-        html+=`
-        <div class="feedback">
-        ⚫ ${row.black}
-        ⚪ ${row.white}
-        </div>`;
 
 
         div.innerHTML=html;
